@@ -1,15 +1,21 @@
-open Utils
+[%%cstruct
+  type ethernet =
+    { tmac : uint8 [@len 6];
+      smac : uint8 [@len 6];
+      etype : uint16;
+    }[@@big_endian]
+]
 
-type etype = IPV4 | ARP
+[%%cenum
+  type etype =
+    | IPV4 [@id 0x0800]
+    | ARP [@id 0x0806]
+  [@@uint16]
+]
 
-let build src_mac dest_mac _type data =
-  let ether_type =
-    match _type with
-    | IPV4 -> 0x0800
-    | ARP -> 0x0806
-  in
-  let header = Bytes.create 14 in
-  Bytes.blit dest_mac 0 header 0 6;
-  Bytes.blit src_mac 0 header 6 6;
-  set_int header ~pos:12 ~len:2 ether_type;
-  Bytes.cat header data
+let build smac tmac etype payload =
+  let pkt = Cstruct.create sizeof_ethernet in
+  set_ethernet_tmac tmac 0 pkt;
+  set_ethernet_smac smac 0 pkt;
+  set_ethernet_etype pkt (etype_to_int etype);
+  Cstruct.to_string @@ Cstruct.append pkt payload

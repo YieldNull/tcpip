@@ -8,8 +8,17 @@ else
   ocamlc=""
 fi
 
-corebuild -r -pkgs core,ipaddr,tuntap,async,cstruct,charrua-core.wire -Is src,test $*
-# -lflags $ocamlc`pwd`/src/tuntap_stubs.c $*
+ocamlbuild -r \
+    -use-ocamlfind \
+    -tag thread \
+    -tag debug \
+    -tag bin_annot \
+    -tag short_paths \
+    -cflags "-w A-4-33-40-41-42-43-34-44" \
+    -cflags -strict-sequence \
+    -pkgs core,ipaddr,tuntap,async,ppx_cstruct,cstruct,charrua-core.wire \
+    -Is src,test \
+    $*
 
 if [[ "$path" =~ .*\.(byte|native)$ ]]; then
   name=`basename "$path"`

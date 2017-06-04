@@ -98,7 +98,8 @@ let handle_ack pkt =
       | _ -> None
     ) in
   ignore @@ Async.Unix.system @@
-  sprintf "ifconfig tap0 %s netmask %s" (V4.to_string ipaddr) (V4.to_string netmask);
+  sprintf "ifconfig %s %s netmask %s" Iface.devname (V4.to_string ipaddr) (V4.to_string netmask);
+  Iface.set_ipaddr ipaddr;
   None
 
 let handle packet =

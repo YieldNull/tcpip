@@ -1,5 +1,5 @@
 open Utils
-open Core.Std
+open Core
 
 type protocol =
   | ICMP

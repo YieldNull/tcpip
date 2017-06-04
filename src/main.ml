@@ -1,10 +1,7 @@
 open Ipaddr
-open Printf
 open Core
 open Async
 open Utils
-
-let devname = "tap0"
 
 let parse_udp writer frame =
   let base = 34 in
@@ -25,7 +22,12 @@ let parse_ip writer packet =
   | 0x11 -> parse_udp writer packet
   | _ -> return ()
 
-let parse_arp writer packet = return ()
+let parse_arp writer packet =
+  match Arp.handle @@ Cstruct.of_string
+    @@ String.sub packet ~pos:14 ~len:Arp.sizeof_arp
+  with
+  | Some pkt -> Writer.write writer pkt; return @@ ignore @@ Writer.flushed writer
+  | _ -> return ()
 
 let parse_ethernet writer packet =
   let t = String.sub packet ~pos:12 ~len:2 in
@@ -36,22 +38,24 @@ let parse_ethernet writer packet =
 
 let rec drive reader writer =
   let writer = Writer.create (Reader.fd reader) in
-  let buf = (Bytes.create 1500) in
+  let buf = (Bytes.create 1514) in
   Reader.read reader buf
   >>= fun i ->
   parse_ethernet writer buf
   >>= fun _ -> drive reader writer
 
 let write writer =
-  let packet = Dhcp.discover @@ Tuntap.get_macaddr devname in
+  let macaddr = Tuntap.get_macaddr Iface.devname in
+  let packet = Dhcp.discover macaddr in
+  Iface.set_macaddr macaddr;
   Writer.write writer packet;
   ignore @@ Writer.flushed writer
 
 let setup () =
-  Unix.openfile ("/dev/" ^ devname) ~mode:[Unix.(`Rdwr)]
+  Unix.openfile ("/dev/" ^ Iface.devname) ~mode:[Unix.(`Rdwr)]
   >>| fun fd ->
   Unix.system @@
-  sprintf "ifconfig %s up && ifconfig bridge1 addm %s" devname devname
+  sprintf "ifconfig %s up && ifconfig bridge1 addm %s" Iface.devname Iface.devname
   >>| function
   | Result.Ok _ -> let reader = Reader.create fd in
     let writer = Writer.create fd in
