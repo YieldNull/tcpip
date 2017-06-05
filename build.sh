@@ -16,8 +16,10 @@ ocamlbuild -r \
     -tag short_paths \
     -cflags "-w A-4-33-40-41-42-43-34-44" \
     -cflags -strict-sequence \
-    -pkgs core,ipaddr,tuntap,async,ppx_cstruct,cstruct,charrua-core.wire \
-    -Is src,test \
+    -pkgs core,async,ipaddr,cstruct \
+    -pkgs ppx_cstruct,ppx_sexp_conv \
+    -Is src \
+    -lflags $ocamlc`pwd`/src/stubs.c \
     $*
 
 if [[ "$path" =~ .*\.(byte|native)$ ]]; then

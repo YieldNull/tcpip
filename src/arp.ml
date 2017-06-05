@@ -1,6 +1,10 @@
 open Ipaddr
 open Core
 
+(* Ether Address Resolution Protocol
+   https://tools.ietf.org/html/rfc826
+*)
+
 [%%cstruct
   type arp =
     { htype : uint16;
@@ -22,32 +26,31 @@ open Core
   [@@uint16]
 ]
 
-let cache = Hashtbl.create ~hashable:Int32.hashable ()
-
 let handle packet =
+  let packet = Cstruct.of_bytes packet in
   let ptype = get_arp_ptype packet in
-  if ptype = 0x0800 then
+  if ptype = Ether.etype_to_int Ether.IPV4 then
     let sha = Cstruct.to_string @@ get_arp_sha packet in
     let spa = get_arp_spa packet in
     let tpa = get_arp_tpa packet in
     let oper = get_arp_oper packet in
     let merge_flag =
-      match Hashtbl.find cache spa with
-      | Some _ -> Hashtbl.set cache ~key:spa ~data:sha; true
+      match Iface.arp_find spa with
+      | Some _ -> Iface.arp_set spa sha; true
       | None -> false
     in
-    let iface_ip = V4.to_int32 @@ Iface.get_ipaddr () in
-    let iface_mac = Macaddr.to_bytes @@ Iface.get_macaddr () in
+    let iface_ip = V4.to_int32 @@ Iface.ipaddr () in
+    let iface_mac = Macaddr.to_bytes @@ Iface.macaddr () in
     if Int32.equal tpa iface_ip && (sha <> iface_mac) then
       begin
-        if merge_flag then Hashtbl.add_exn cache ~key:spa ~data:sha;
+        if merge_flag then Iface.arp_add_exn spa sha;
         if int_to_oper oper = Some REQUEST then begin
           set_arp_sha iface_mac 0 packet;
           set_arp_spa packet iface_ip;
           set_arp_tha sha 0 packet ;
           set_arp_tpa packet spa;
           set_arp_oper packet (oper_to_int REPLY);
-          Some (Ethernet.build iface_mac sha Ethernet.ARP packet)
+          Some (Ether.build iface_mac sha Ether.ARP (Cstruct.to_string packet))
         end else None
       end else None
   else None
