@@ -15,6 +15,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+(* Dynamic Host Configuration Protocol
+   https://www.ietf.org/rfc/rfc2131.txt
+   https://www.ietf.org/rfc/rfc2132.txt
+*)
+
 open Sexplib.Conv
 open Sexplib.Std
 
@@ -1131,7 +1136,7 @@ let buf_of_pkt pkt =
       options_end
   in
   let dhcp = Cstruct.set_len dhcp ((Cstruct.len dhcp) - (Cstruct.len buf_end)) in
-  Cstruct.to_string dhcp
+  dhcp
 
 let find_option f options = find_map f options
 

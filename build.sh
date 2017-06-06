@@ -18,7 +18,7 @@ ocamlbuild -r \
     -cflags -strict-sequence \
     -pkgs core,async,ipaddr,cstruct \
     -pkgs ppx_cstruct,ppx_sexp_conv \
-    -Is src \
+    -Is src,src/wire,src/handler \
     -lflags $ocamlc`pwd`/src/stubs.c \
     $*
 

@@ -4,21 +4,21 @@ open Async
 
 type t =
   { devname : string;
-    mutable macaddr : Macaddr.t;
-    mutable ipaddr  : V4.t;
-    mutable netmask : V4.t;
-    mutable router  : V4.t;
-    mutable dns : V4.t list;
+    mutable macaddr : Caml.Bytes.t;
+    mutable ipaddr  : int32;
+    mutable netmask : int32;
+    mutable router  : int32;
+    mutable dns : int32 list;
     arp_cache : (int32, string) Hashtbl.t;
   }
 
 
 let tap =
   { devname = "tap0";
-    macaddr = Macaddr.broadcast;
-    ipaddr  = V4.any;
-    netmask = V4.any;
-    router  = V4.routers;
+    macaddr = Macaddr.to_bytes Macaddr.broadcast;
+    ipaddr  = V4.to_int32 V4.any;
+    netmask = V4.to_int32 V4.any;
+    router  = V4.to_int32 V4.routers;
     dns = [];
     arp_cache = Hashtbl.create ~hashable:Int32.hashable ();
   }
@@ -30,7 +30,7 @@ let filename = "/dev/" ^ tap.devname
 external stub_get_macaddr : string -> string = "stub_get_macaddr"
 
 let init () =
-  tap.macaddr <- Macaddr.of_bytes_exn @@ stub_get_macaddr tap.devname;
+  tap.macaddr <- stub_get_macaddr tap.devname;
   Unix.system @@
   sprintf "ifconfig %s up && ifconfig %s addm %s" tap.devname bridge tap.devname
 
@@ -41,7 +41,9 @@ let setup ipaddr netmask router dns =
   tap.dns <- dns;
   Unix.system @@
   sprintf "ifconfig %s %s netmask %s"
-    tap.devname (V4.to_string tap.ipaddr) (V4.to_string tap.netmask)
+    tap.devname
+    (V4.to_string @@ V4.of_int32 tap.ipaddr)
+    (V4.to_string @@ V4.of_int32 tap.netmask)
 
 let devname () = tap.devname
 let macaddr () = tap.macaddr

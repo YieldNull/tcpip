@@ -747,7 +747,7 @@ type pkt = {
 (** Conversions for {! pkt}. *)
 
 val pkt_of_buf : Cstruct.t -> int -> (pkt, string) result
-val buf_of_pkt : pkt -> bytes
+val buf_of_pkt : pkt -> Cstruct.t
 
 val pkt_of_sexp : Sexplib.Sexp.t -> pkt
 val sexp_of_pkt : pkt -> Sexplib.Sexp.t

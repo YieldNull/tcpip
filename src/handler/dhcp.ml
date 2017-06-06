@@ -3,7 +3,7 @@ open Dhcp_wire
 open Core
 
 let discover () =
-  let mac = Iface.macaddr () in
+  let mac = Macaddr.of_bytes_exn @@ Iface.macaddr () in
   let xid = Random.int32 0x7fffffffl in
   let packet =
     { op = BOOTREQUEST;
@@ -22,7 +22,7 @@ let discover () =
       file = "";
       options = [
         Message_type DHCPDISCOVER;
-        Max_message Ether.mtu;
+        Max_message Ether_wire.mtu;
         Client_id (Hwaddr mac);
         Ip_lease_time 7776000l;
         Hostname (Iface.devname ());
@@ -39,9 +39,15 @@ let discover () =
   let sport = client_port in
   let dport = server_port in
   let dhcp = buf_of_pkt packet in
-  let udp = Udp.build sip dip sport dport dhcp in
-  let ip = Ipv4.build Ipv4.UDP sip dip udp in
-  Ether.build smac dmac Ether.IPV4 (List.hd_exn ip)
+  let udp = Udp_wire.to_pkt @@ Udp_wire.create ~sip ~dip ~sport ~dport dhcp in
+  let ip = Ipv4_wire.create ~protocol:Ipv4_wire.UDP ~sip ~dip
+      (Cstruct.len udp + Cstruct.len dhcp)
+           |> List.hd_exn
+           |> Ipv4_wire.to_pkt
+  in
+  let ether = Ether_wire.to_pkt @@
+    Ether_wire.create ~dmac ~smac ~etype:Ether_wire.IPV4 in
+  Cstruct.concat [ ether; ip; udp; dhcp ]
 
 let request mac xid serverip requestip =
   let packet =
@@ -61,7 +67,7 @@ let request mac xid serverip requestip =
       file = "";
       options = [
         Message_type DHCPREQUEST;
-        Max_message (Ether.mtu);
+        Max_message (Ether_wire.mtu);
         Client_id (Hwaddr mac);
         Hostname (Iface.devname ());
         Server_identifier serverip;
@@ -79,9 +85,15 @@ let request mac xid serverip requestip =
   let sport = client_port in
   let dport = server_port in
   let dhcp = buf_of_pkt packet in
-  let udp = Udp.build sip dip sport dport dhcp in
-  let ip = Ipv4.build Ipv4.UDP sip dip udp in
-  Ether.build smac dmac Ether.IPV4 (List.hd_exn ip)
+  let udp = Udp_wire.to_pkt @@ Udp_wire.create ~sip ~dip ~sport ~dport dhcp in
+  let ip = Ipv4_wire.create ~protocol:Ipv4_wire.UDP ~sip ~dip
+      (Cstruct.len udp + Cstruct.len dhcp)
+           |> List.hd_exn
+           |> Ipv4_wire.to_pkt
+  in
+  let ether = Ether_wire.to_pkt @@
+    Ether_wire.create ~dmac ~smac ~etype:Ether_wire.IPV4 in
+  Cstruct.concat [ ether; ip; udp; dhcp ]
 
 let handle_offer pkt =
   let ipaddr = pkt.yiaddr in
@@ -94,15 +106,15 @@ let handle_offer pkt =
   Some (request mac xid serverip ipaddr)
 
 let handle_ack pkt =
-  let ipaddr = pkt.yiaddr in
-  let netmask = Option.value_exn (find_subnet_mask pkt.options) in
-  let router = List.hd_exn @@ collect_routers pkt.options in
-  let dns = collect_dns_servers pkt.options in
+  let ipaddr = V4.to_int32 @@ pkt.yiaddr in
+  let netmask = V4.to_int32 @@ Option.value_exn (find_subnet_mask pkt.options) in
+  let router = V4.to_int32 @@ List.hd_exn @@ collect_routers pkt.options in
+  let dns = List.map (collect_dns_servers pkt.options) ~f:V4.to_int32 in
   ignore @@ Iface.setup ipaddr netmask router dns;
   None
 
 let handle packet =
-  let pkt = match pkt_of_buf (Cstruct.of_bytes packet) (Bytes.length packet) with
+  let pkt = match pkt_of_buf packet (Cstruct.len packet) with
     | Result.Ok pkt -> pkt
     | _ -> failwith "Invalid DHCP packet"
   in

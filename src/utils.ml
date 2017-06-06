@@ -30,24 +30,40 @@ let int_of_bytes data =
       num lsl ((len - i - 1) * 8) + acc
     )
 
-let checksum packet =
-  let sum = ref 0 in
-  let len = Bytes.length packet in
-  for i = 0 to len - 1 do
-    if i mod 2 = 1 then
-      let high = int_of_char @@ Bytes.get packet (i - 1) in
-      let low = int_of_char @@ Bytes.get packet i in
-      let num = high lsl 8 + low in
-      sum := !sum + num;
-  done;
-  if len mod 2 = 1 then begin
-    let high = int_of_char @@ Bytes.get packet (len - 1) in
-    let num = high lsl 8 in
-    sum := !sum + num
-  end;
+let carry_and_lnot sum =
+  let sum = ref sum in
   while !sum lsr 16 > 0 do
     sum := !sum land 0xffff + !sum lsr 16
   done;
   (lnot !sum) land 0xffff
 
+let one's_sum packet =
+  let sum = ref 0 in
+  let len = Cstruct.len packet in
+  for i = 0 to len - 1 do
+    if i mod 2 = 1 then
+      let high = Cstruct.get_uint8 packet (i - 1) in
+      let low = Cstruct.get_uint8 packet i in
+      let num = high lsl 8 + low in
+      sum := !sum + num;
+  done;
+  if len mod 2 = 1 then begin
+    let high = Cstruct.get_uint8 packet (len - 1) in
+    let num = high lsl 8 in
+    sum := !sum + num
+  end;
+  !sum
+
+let checksum packet = carry_and_lnot @@ one's_sum packet
+
 let validate packet = checksum packet = 0
+
+let checksum_list packets =
+  carry_and_lnot (List.fold packets ~init:0 ~f:(fun acc p -> one's_sum p + acc))
+
+let validate_list packets = checksum_list packets = 0
+
+let send writer packet =
+  let open Async in
+  Writer.write writer (Cstruct.to_string packet);
+  ignore @@ Writer.flushed writer
