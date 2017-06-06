@@ -6,7 +6,14 @@ open Utils
 let rec drive reader writer =
   let buf = (Bytes.create Ether_wire.mpkt) in
   Reader.read reader buf
-  >>= fun _ -> return @@ Ether.handle writer (Cstruct.of_string buf)
+  >>= (fun rs ->
+      match rs with
+      | Reader.(`Eof) -> failwith "EOF"
+      | Reader.(`Ok len) ->
+        return
+        @@ Ether.handle writer
+        @@ Cstruct.sub (Cstruct.of_string buf) 0 len
+    )
   >>= fun _ -> drive reader writer
 
 let setup () =
@@ -19,8 +26,7 @@ let setup () =
         let writer = Writer.create fd in
         ignore @@ drive reader writer;
         let packet = Dhcp.discover () in
-        send writer packet;
-        ignore @@ Writer.flushed writer
+        send writer packet
       ) ()
   | _ -> failwith "initialization failed"
 

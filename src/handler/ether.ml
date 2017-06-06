@@ -5,5 +5,5 @@ let handle writer frame =
   | None -> ()
   | Some ether ->
     match ether.etype with
-    | IPV4 -> Ipv4.handle writer frame
+    | IPV4 -> Ipv4.handle writer frame ether
     | ARP -> Arp.handle writer frame

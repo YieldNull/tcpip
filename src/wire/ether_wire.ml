@@ -45,3 +45,8 @@ let to_pkt t =
   set_ether_smac t.smac 0 pkt;
   set_ether_etype pkt (etype_to_int t.etype);
   pkt
+
+let rev_mac t =
+  let smac = t.dmac in
+  let dmac = t.smac in
+  { t with smac; dmac }

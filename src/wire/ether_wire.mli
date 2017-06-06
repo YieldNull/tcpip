@@ -18,3 +18,5 @@ val create : dmac:bytes -> smac:bytes -> etype:etype -> t
 
 val of_frame : Cstruct.t -> t option
 val to_pkt : t -> Cstruct.t
+
+val rev_mac : t -> t
