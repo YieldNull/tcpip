@@ -6,5 +6,5 @@ let handle writer frame ether =
   | Some ipv4 ->
     match ipv4.protocol with
     | UDP -> Udp.handle writer frame ipv4
+    | TCP -> Tcp.handle writer frame ipv4
     | ICMP -> Icmp.handle writer frame ether ipv4
-    | _ -> ()

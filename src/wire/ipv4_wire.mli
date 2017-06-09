@@ -16,6 +16,7 @@ type t =
   }
 
 val size : int
+val protocol_to_int : protocol -> int
 
 val create : ?ttl:int -> protocol:protocol -> sip:int32 -> dip:int32 -> int -> t list
 
