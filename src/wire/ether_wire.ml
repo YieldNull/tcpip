@@ -50,3 +50,6 @@ let rev_mac t =
   let smac = t.dmac in
   let dmac = t.smac in
   { t with smac; dmac }
+
+let ipv4_pkt dmac =
+  to_pkt @@ create ~dmac ~smac:(Iface.macaddr ()) ~etype:IPV4

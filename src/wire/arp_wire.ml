@@ -3,6 +3,7 @@
 *)
 
 open Cstruct
+open Ipaddr
 
 [%%cstruct
   type arp =
@@ -76,3 +77,7 @@ let to_pkt t =
   set_arp_tha t.tha 0 pkt;
   set_arp_tpa pkt t.tpa;
   pkt
+
+let request ip =
+  to_pkt @@ create ~sha:(Iface.macaddr ()) ~spa:(Iface.ipaddr ())
+    ~tha:(V4.to_bytes V4.broadcast) ~tpa:ip ~oper:REQUEST

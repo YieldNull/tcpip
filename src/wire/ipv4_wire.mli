@@ -22,3 +22,5 @@ val create : ?ttl:int -> protocol:protocol -> sip:int32 -> dip:int32 -> int -> t
 
 val of_frame : Cstruct.t -> t option
 val to_pkt : t -> Cstruct.t
+
+val tcp_pkt : ?ttl:int -> int32 -> int -> Cstruct.t

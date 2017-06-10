@@ -274,7 +274,7 @@ end
       seq       : uint32;
       ack       : uint32;
       hdlen     : uint8; (* first 4 bits *) (* The number of 32 bit words in the TCP Header *)
-      control   : uint8; (* last 6 bits *)
+      ctrl   : uint8; (* last 6 bits *)
       window    : uint16;
       checksum  : uint16;
       urgent    : uint16;
@@ -291,7 +291,7 @@ end
     }[@@big_endian]
 ]
 
-type contorl = URG | ACK | PSH | RST | SYN | FIN
+type ctrl = URG | ACK | PSH | RST | SYN | FIN
 
 type t =
   { sip     : uint32;
@@ -300,36 +300,37 @@ type t =
     dport   : uint16;
     seq     : uint32;
     ack     : uint32;
-    control : uint8;
+    ctrl : uint8;
     window  : uint16;
     urgent  : uint16;
     options : Option.t list;
     payload : Cstruct.t;
   }
 
-let int_to_control_list num =
+let int_to_ctrl_list num =
   let num = num land 0b00111111 in
-  let controls = [ URG; ACK; PSH; RST; SYN; FIN ] in
+  let ctrls = [ URG; ACK; PSH; RST; SYN; FIN ] in
   let mask = 0b00100000 in
-  List.filter_mapi controls ~f:(fun i v ->
+  List.filter_mapi ctrls ~f:(fun i v ->
       if num land (mask lsr i) > 0 then Some v else None
     )
 
-let control_list_to_int lst =
-  List.fold lst ~init:0 ~f:(fun acc c ->
-      let v = match c with
-        | URG -> 0b00100000
-        | ACK -> 0b00010000
-        | PSH -> 0b00001000
-        | RST -> 0b00000100
-        | SYN -> 0b00000010
-        | FIN -> 0b00000001
-      in acc + v
-    )
+let ctrl_to_int = function
+  | URG -> 0b00100000
+  | ACK -> 0b00010000
+  | PSH -> 0b00001000
+  | RST -> 0b00000100
+  | SYN -> 0b00000010
+  | FIN -> 0b00000001
 
-let int_to_hdlen num = (num lsr 4) * 4
+let ctrl_list_to_int lst =
+  List.fold lst ~init:0 ~f:(fun acc c -> acc + (ctrl_to_int c))
 
-let hdlen_to_int len = (len / 4) lsl 4
+let is_ctrl_set num ctrl = num land (ctrl_to_int ctrl) > 0
+
+let hdlen_of_int num = (num lsr 4) * 4
+
+let int_to_hdlen len = (len / 4) lsl 4
 
 let build_pseudo_header sip dip len =
   let pstcp = Cstruct.create sizeof_pstcp in
@@ -353,14 +354,14 @@ let of_frame frame ipv4 =
     let dport = get_tcp_dport pkt in
     let seq = get_tcp_seq pkt in
     let ack = get_tcp_ack pkt in
-    let hdlen = int_to_hdlen @@ get_tcp_hdlen pkt in
-    let control = get_tcp_control pkt in
+    let hdlen = hdlen_of_int @@ get_tcp_hdlen pkt in
+    let ctrl = get_tcp_ctrl pkt in
     let window = get_tcp_window pkt in
     let urgent = get_tcp_urgent pkt in
     let options = Option.list_of_buf (Cstruct.shift pkt sizeof_tcp) in
     let payload = Cstruct.shift pkt hdlen in
     Some { sip; dip; sport; dport; seq; ack;
-           control; window; urgent; options; payload }
+           ctrl; window; urgent; options; payload }
 
 let to_pkt t =
   let header = Cstruct.create sizeof_tcp in
@@ -368,17 +369,17 @@ let to_pkt t =
   set_tcp_dport header t.dport;
   set_tcp_seq header t.seq;
   set_tcp_ack header t.ack;
-  set_tcp_control header t.control;
+  set_tcp_ctrl header t.ctrl;
   set_tcp_window header t.window;
   set_tcp_checksum header 0;
   set_tcp_urgent header t.urgent;
   let options = Option.list_to_buf t.options in
   let opt_len = Cstruct.len options in
-  let pad_len = 4 - (opt_len mod 4) in
+  let pad_len = (4 - (opt_len mod 4)) mod 4 in
   let padding = Cstruct.create pad_len in
   let hdlen = sizeof_tcp + opt_len + pad_len in
   Cstruct.memset padding 0;
-  set_tcp_hdlen header hdlen;
+  set_tcp_hdlen header (int_to_hdlen hdlen);
   let len = hdlen + (Cstruct.len t.payload) in
   let pstcp = build_pseudo_header t.sip t.dip len in
   set_tcp_checksum header (Utils.checksum_list [pstcp; header; options; padding; t.payload]);

@@ -86,7 +86,7 @@ module Option : sig
   val list_to_buf : t list -> Cstruct.t
 end
 
-type contorl = URG | ACK | PSH | RST | SYN | FIN
+type ctrl = URG | ACK | PSH | RST | SYN | FIN
 
 type t =
   { sip     : uint32;
@@ -95,15 +95,16 @@ type t =
     dport   : uint16;
     seq     : uint32;
     ack     : uint32;
-    control : uint8;
+    ctrl : uint8;
     window  : uint16;
     urgent  : uint16;
     options : Option.t list;
     payload : Cstruct.t;
   }
 
-val int_to_control_list : int -> contorl list
-val control_list_to_int : contorl list -> int
+val int_to_ctrl_list : int -> ctrl list
+val ctrl_list_to_int : ctrl list -> int
+val is_ctrl_set : int -> ctrl -> bool
 
 val of_frame : Cstruct.t -> Ipv4_wire.t -> t option
 val to_pkt : t -> Cstruct.t

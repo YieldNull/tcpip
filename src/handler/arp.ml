@@ -15,7 +15,7 @@ let handle writer frame =
       let iface_mac = Iface.macaddr () in
       if Int32.equal arp.tpa iface_ip && (arp.sha <> iface_mac) then
         begin
-          if merge_flag then Iface.arp_add_exn arp.spa arp.sha;
+          if not merge_flag then Iface.arp_add_exn arp.spa arp.sha;
           if arp.oper = REQUEST then begin
             let arp_t = Arp_wire.create ~sha:iface_mac
                 ~spa:iface_ip ~tha:arp.sha ~tpa:arp.spa ~oper:REPLY in

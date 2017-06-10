@@ -13,7 +13,7 @@ val ipaddr : unit -> int32
 val netmask : unit -> int32
 val router : unit -> int32
 
-val arp_cache : unit -> (int32, string) Core.Hashtbl.t
-val arp_find : int32 Core.Hashtbl.key -> string option
-val arp_set : int32 Core.Hashtbl.key -> string -> unit
-val arp_add_exn : int32 Core.Hashtbl.key -> string -> unit
+val arp_cache : unit -> (int32, bytes) Core.Hashtbl.t
+val arp_find : int32 Core.Hashtbl.key -> bytes option
+val arp_set : int32 Core.Hashtbl.key -> bytes -> unit
+val arp_add_exn : int32 Core.Hashtbl.key -> bytes -> unit

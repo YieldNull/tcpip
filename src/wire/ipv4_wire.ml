@@ -97,3 +97,6 @@ let to_pkt t =
   set_ipv4_dip pkt t.dip;
   set_ipv4_checksum pkt (Utils.checksum pkt);
   pkt
+
+let tcp_pkt ?(ttl = 64) dip len =
+  to_pkt @@ List.hd_exn @@ create ~ttl ~protocol:TCP ~sip:(Iface.ipaddr ()) ~dip len

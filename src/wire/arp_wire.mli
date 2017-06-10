@@ -22,3 +22,5 @@ val create : sha:bytes -> spa:int32 -> tha:bytes -> tpa:int32 -> oper:oper -> t
 
 val of_frame : Cstruct.t -> t option
 val to_pkt : t -> Cstruct.t
+
+val request : int32 -> Cstruct.t

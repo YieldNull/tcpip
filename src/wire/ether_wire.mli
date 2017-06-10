@@ -20,3 +20,5 @@ val of_frame : Cstruct.t -> t option
 val to_pkt : t -> Cstruct.t
 
 val rev_mac : t -> t
+
+val ipv4_pkt : bytes -> Cstruct.t
