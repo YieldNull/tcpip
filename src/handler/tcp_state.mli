@@ -20,8 +20,6 @@ type action =
   | AT_FIN
   | AT_RST
   | AT_SYN_ACK
-  | AT_FIN_ACK
-  | AT_RST_ACK
   | AT_TIMEOUT
 
-val trans : t -> action -> t * action option
+val trans_state : t -> action -> (t * action option) option

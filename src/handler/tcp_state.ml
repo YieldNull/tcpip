@@ -33,8 +33,6 @@ type action =
   | AT_FIN
   | AT_RST
   | AT_SYN_ACK
-  | AT_FIN_ACK
-  | AT_RST_ACK
   | AT_TIMEOUT
 
 let action_len = 11
@@ -48,9 +46,7 @@ let action_to_int = function
   | AT_FIN -> 5
   | AT_RST -> 6
   | AT_SYN_ACK -> 7
-  | AT_FIN_ACK -> 8
-  | AT_RST_ACK -> 9
-  | AT_TIMEOUT -> 10
+  | AT_TIMEOUT -> 8
 
 let state_to_int = function
   | ST_CLOSED       -> 0
@@ -88,37 +84,33 @@ let table =
 
       ST_AT_SYN_RECEIVED, [ AT_ACK      >> ST_ESTABLISHED, None;
                             AT_CLOSE    >> ST_FIN_WAIT1, Some AT_FIN;
-                            AT_RST      >> ST_LISTEN, None;
-                            AT_RST_ACK  >> ST_LISTEN, None ];
+                            AT_RST      >> ST_LISTEN, None ];
       (* If the receiver was in SYN-RECEIVED state
          and had previously been in the LISTEN state,
          then the receiver returns to the LISTEN state,
          otherwise the receiver aborts the connection and goes to the CLOSED state. *)
       (* simultaneous open is rare, so simply set state to LISTEN *)
 
-      ST_ESTABLISHED,  [ AT_FIN   >> ST_CLOSE_WAIT, Some AT_ACK;
-                         AT_CLOSE >> ST_FIN_WAIT1, Some AT_FIN;
+      ST_ESTABLISHED,  [ AT_ACK     >> ST_ESTABLISHED, Some AT_ACK;
+                         AT_CLOSE   >> ST_FIN_WAIT1, Some AT_FIN;
+                         AT_FIN     >> ST_CLOSE_WAIT, Some AT_ACK;
+                         AT_RST     >> ST_CLOSED, None ];
+
+      ST_FIN_WAIT1,    [ AT_ACK >> ST_FIN_WAIT2, None;
+                         AT_FIN >> ST_TIME_WAIT, Some AT_ACK;
+                         AT_RST >> ST_CLOSED, None ];
+
+      ST_FIN_WAIT2,    [ AT_FIN >> ST_TIME_WAIT, Some AT_ACK;
+                         AT_RST >> ST_CLOSED, None ];
+
+      ST_CLOSE_WAIT,   [ AT_CLOSE >> ST_LAST_ACK, Some AT_FIN;
                          AT_RST   >> ST_CLOSED, None ];
 
-      ST_FIN_WAIT1,    [ AT_ACK     >> ST_FIN_WAIT2, None;
-                         AT_FIN     >> ST_CLOSING, Some AT_ACK;
-                         AT_FIN_ACK >> ST_TIME_WAIT, Some AT_ACK;
-                         AT_RST     >> ST_CLOSED, None;
-                         AT_RST_ACK >> ST_CLOSED, None ];
+      ST_CLOSING,      [ AT_ACK >> ST_TIME_WAIT, None;
+                         AT_RST >> ST_CLOSED, None ];
 
-      ST_FIN_WAIT2,    [ AT_FIN     >> ST_TIME_WAIT, Some AT_ACK;
-                         AT_RST     >> ST_CLOSED, None ];
-
-      ST_CLOSE_WAIT,   [ AT_CLOSE   >> ST_LAST_ACK, Some AT_FIN;
-                         AT_RST     >> ST_CLOSED, None ];
-
-      ST_CLOSING,      [ AT_ACK     >> ST_TIME_WAIT, None;
-                         AT_RST     >> ST_CLOSED, None;
-                         AT_RST_ACK >> ST_CLOSED, None ];
-
-      ST_LAST_ACK,     [ AT_ACK     >> ST_CLOSED, None;
-                         AT_RST     >> ST_CLOSED, None;
-                         AT_RST_ACK >> ST_CLOSED, None ];
+      ST_LAST_ACK,     [ AT_ACK >> ST_CLOSED, None;
+                         AT_RST >> ST_CLOSED, None ];
 
       ST_TIME_WAIT,    [ AT_TIMEOUT >> ST_CLOSED, None;
                          AT_RST     >> ST_CLOSED, None ];
@@ -126,7 +118,7 @@ let table =
   in
   Array.map arr ~f:(fun tuple ->
       let actions = Array.create ~len:action_len None in
-      let state, table = tuple in
+      let _, table = tuple in
       List.iter table ~f:(fun e ->
           let (action_index, state), sending = e in
           Array.set actions action_index (Some (state, sending))
@@ -134,9 +126,6 @@ let table =
       actions
     )
 
-let trans state action =
+let trans_state state action =
   let trans_table = Array.get table (state_to_int state) in
-  let result = Array.get trans_table (action_to_int action) in
-  match result with
-  | Some x -> x
-  | None -> state, None
+  Array.get trans_table (action_to_int action)

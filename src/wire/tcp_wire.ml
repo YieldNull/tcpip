@@ -243,7 +243,7 @@ module Option = struct
         aux (opt :: acc) (Cstruct.shift buf len)
       in
       match int_to_opcode @@ Cstruct.get_uint8 buf 0 with
-      | None -> failwith "unkonwn tcp option"
+      | None -> let len = Cstruct.get_uint8 buf 1 in aux acc (Cstruct.shift buf len)
       | Some kind -> match kind with
         | END_OF_OPTIONS -> (End_of_options (eol_of_buf buf)) :: acc
         | NO_OPERATION -> take (No_operation (noper_of_buf buf)) sizeof_noper
@@ -253,7 +253,7 @@ module Option = struct
         | SACK -> let sack = sack_of_buf buf in take (Sack sack) sack.len
         | TIMESTAMPS -> take (Timestamps (tmstamps_of_buf buf)) sizeof_tmstamps
     in
-    aux [] buf
+    if Cstruct.len buf = 0 then [] else aux [] buf
 
   let list_to_buf options =
     Cstruct.concat @@ List.map options ~f:(function
@@ -300,12 +300,18 @@ type t =
     dport   : uint16;
     seq     : uint32;
     ack     : uint32;
-    ctrl : uint8;
+    ctrl    : uint8;
     window  : uint16;
     urgent  : uint16;
     options : Option.t list;
     payload : Cstruct.t;
   }
+
+let to_string t =
+  sprintf "sip:%s dip:%s sport:%d dport:%d seq:%ld ack:%ld window:%d"
+    (Ipaddr.V4.to_string (Ipaddr.V4.of_int32 t.sip))
+    (Ipaddr.V4.to_string (Ipaddr.V4.of_int32 t.dip))
+    t.sport t.dport t.seq t.ack t.window
 
 let int_to_ctrl_list num =
   let num = num land 0b00111111 in
@@ -358,7 +364,7 @@ let of_frame frame ipv4 =
     let ctrl = get_tcp_ctrl pkt in
     let window = get_tcp_window pkt in
     let urgent = get_tcp_urgent pkt in
-    let options = Option.list_of_buf (Cstruct.shift pkt sizeof_tcp) in
+    let options = Option.list_of_buf (Cstruct.sub pkt sizeof_tcp (hdlen - sizeof_tcp)) in
     let payload = Cstruct.shift pkt hdlen in
     Some { sip; dip; sport; dport; seq; ack;
            ctrl; window; urgent; options; payload }

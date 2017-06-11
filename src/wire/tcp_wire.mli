@@ -95,7 +95,7 @@ type t =
     dport   : uint16;
     seq     : uint32;
     ack     : uint32;
-    ctrl : uint8;
+    ctrl    : uint8;
     window  : uint16;
     urgent  : uint16;
     options : Option.t list;
@@ -108,3 +108,5 @@ val is_ctrl_set : int -> ctrl -> bool
 
 val of_frame : Cstruct.t -> Ipv4_wire.t -> t option
 val to_pkt : t -> Cstruct.t
+
+val to_string : t -> string
