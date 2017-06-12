@@ -17,4 +17,7 @@ val open_send : unit -> t
 val gen_rst : ?conn:t -> Tcp_wire.t -> Tcp_wire.t
 val gen_fin_ack : t -> Tcp_wire.t -> Tcp_wire.t
 val gen_syn_ack  : t -> Tcp_wire.t -> Tcp_wire.t
-val gen_ack  : t -> Tcp_wire.t -> Tcp_wire.t
+
+val gen_ack_ctrl : t -> Tcp_wire.t -> Tcp_wire.t
+val gen_ack_data : t -> Tcp_wire.t -> Cstruct.t -> Tcp_wire.t
+val gen_syn_active : sport:int -> dip:int32 -> dport:int -> t -> Tcp_wire.t

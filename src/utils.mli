@@ -9,5 +9,3 @@ val checksum : Cstruct.t -> int
 val validate : Cstruct.t -> bool
 val checksum_list : Cstruct.t list -> int
 val validate_list : Cstruct.t list -> bool
-
-val send : Async.Writer.t -> Cstruct.t -> unit

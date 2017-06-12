@@ -126,6 +126,14 @@ let table =
       actions
     )
 
+let ctrl_to_action num =
+  let open Tcp_wire in
+  if is_ctrl_set num SYN then
+    if is_ctrl_set num ACK then AT_SYN_ACK else AT_SYN
+  else if is_ctrl_set num FIN then AT_FIN
+  else if is_ctrl_set num RST then AT_RST
+  else AT_ACK
+
 let trans_state state action =
   let trans_table = Array.get table (state_to_int state) in
   Array.get trans_table (action_to_int action)

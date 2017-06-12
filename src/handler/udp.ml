@@ -1,6 +1,6 @@
 open Udp_wire
 
-let handle writer frame ipv4 =
+let handle frame ipv4 =
   match of_frame frame ipv4 with
   | None -> ()
   | Some udp ->
@@ -11,5 +11,5 @@ let handle writer frame ipv4 =
           (Ether_wire.size + Ipv4_wire.size + Udp_wire.size)
           (udp.len - Udp_wire.size)
       in match Dhcp.handle payload with
-      | Some pkt -> Utils.send writer pkt
+      | Some pkt -> Inetio.send_cstruct pkt
       | _ -> ()

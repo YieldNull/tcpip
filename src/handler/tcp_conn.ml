@@ -35,7 +35,7 @@ let open_listen () =
   }
 
 let open_send () =
-  { state = Tcp_state.ST_CLOSED;
+  { state       = Tcp_state.ST_CLOSED;
     snd_isn     = 0l;
     snd_unack   = 0l;
     snd_next    = 0l;
@@ -45,6 +45,22 @@ let open_send () =
     rcv_next    = 0l;
     rcv_window  = 65535;
     rcv_urgent  = 0l;
+  }
+
+let gen_syn_active ~sport ~dip ~dport conn =
+  conn.snd_isn <- Random.int32 2147483647l + 1l;
+  conn.snd_unack <- conn.snd_isn;
+  { sip     = Iface.ipaddr ();
+    dip     = dip;
+    sport   = sport;
+    dport   = dport;
+    seq     = conn.snd_isn;
+    ack     = 0l;
+    ctrl    = ctrl_list_to_int [ACK];
+    window  = 0;
+    urgent  = 0;
+    options = [Max_segmentation_size (mss 65535)];
+    payload = Cstruct.of_bytes Caml.Bytes.empty;
   }
 
 let gen_rst ?conn tcp =
@@ -70,7 +86,6 @@ let gen_rst ?conn tcp =
     options = [];
     payload = Cstruct.of_bytes Caml.Bytes.empty;
   }
-
 
 let gen_fin_ack conn tcp =
   conn.snd_unack <- tcp.ack;
@@ -105,18 +120,36 @@ let gen_syn_ack conn tcp =
     payload = Cstruct.of_bytes Caml.Bytes.empty;
   }
 
-let gen_ack conn tcp =
+let gen_ack_ctrl conn tcp =
   conn.snd_unack <- tcp.ack;
   conn.rcv_next <- (of_int_exn @@ Cstruct.len tcp.payload) + tcp.seq + 1l;
   { sip     = Iface.ipaddr ();
     dip     = tcp.sip;
     sport   = tcp.dport;
     dport   = tcp.sport;
-    seq     = conn.snd_unack;
+    seq     = tcp.ack;
     ack     = conn.rcv_next;
     ctrl    = ctrl_list_to_int [ACK];
     window  = conn.rcv_window;
     urgent  = 0;
     options = [];
     payload = Cstruct.of_bytes Caml.Bytes.empty;
+  }
+(* The segment length (SEG.LEN) includes both data and sequence
+   space occupying controls. [RFC793#3.3 page 26] *)
+
+let gen_ack_data conn tcp data =
+  conn.snd_unack <- tcp.ack + (of_int_exn (Cstruct.len data));
+  conn.rcv_next <- (of_int_exn @@ Cstruct.len tcp.payload) + tcp.seq;
+  { sip     = Iface.ipaddr ();
+    dip     = tcp.sip;
+    sport   = tcp.dport;
+    dport   = tcp.sport;
+    seq     = tcp.ack;
+    ack     = conn.rcv_next;
+    ctrl    = ctrl_list_to_int [ACK];
+    window  = conn.rcv_window;
+    urgent  = 0;
+    options = [];
+    payload = data;
   }

@@ -22,4 +22,5 @@ type action =
   | AT_SYN_ACK
   | AT_TIMEOUT
 
+val ctrl_to_action : int -> action
 val trans_state : t -> action -> (t * action option) option

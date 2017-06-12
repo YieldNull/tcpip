@@ -16,7 +16,7 @@ ocamlbuild -r \
     -tag short_paths \
     -cflags "-w A-4-33-40-41-42-43-34-44" \
     -cflags -strict-sequence \
-    -pkgs core,async,ipaddr,cstruct \
+    -pkgs core,ipaddr,cstruct \
     -pkgs ppx_cstruct,ppx_sexp_conv \
     -Is src,src/wire,src/handler \
     -lflags $ocamlc`pwd`/src/stubs.c \

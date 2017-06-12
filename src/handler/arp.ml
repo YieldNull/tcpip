@@ -1,7 +1,7 @@
 open Arp_wire
 open Ipaddr
 
-let handle writer frame =
+let handle frame =
   match of_frame frame with
   | None -> ()
   | Some arp ->
@@ -22,6 +22,6 @@ let handle writer frame =
             let pkt = to_pkt arp_t in
             let ether = Ether_wire.to_pkt @@ Ether_wire.create ~dmac:arp.sha
                 ~smac:iface_mac ~etype:Ether_wire.ARP in
-            Utils.send writer (Cstruct.append ether pkt)
+            Inetio.send_cstruct (Cstruct.append ether pkt)
           end
         end

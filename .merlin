@@ -1,4 +1,4 @@
 B +threads
 B _build/**
-PKG core async ipaddr cstruct ppx_cstruct ppx_sexp_conv
+PKG core ipaddr cstruct ppx_cstruct ppx_sexp_conv
 src/**

@@ -1,6 +1,5 @@
 open Ipaddr
 open Core
-open Async
 
 type t =
   { devname : string;
@@ -25,13 +24,13 @@ let tap =
 
 let bridge = "bridge1"
 
-let filename = "/dev/" ^ tap.devname
+let fd = Unix.openfile ("/dev/" ^ tap.devname) ~mode:[Unix.O_RDWR]
 
 external stub_get_macaddr : string -> string = "stub_get_macaddr"
 
 let init () =
   tap.macaddr <- stub_get_macaddr tap.devname;
-  Unix.system @@
+  ignore @@ Unix.system @@
   sprintf "ifconfig %s up && ifconfig %s addm %s" tap.devname bridge tap.devname
 
 let setup ipaddr netmask router dns =
@@ -39,7 +38,7 @@ let setup ipaddr netmask router dns =
   tap.netmask <- netmask;
   tap.router <- router;
   tap.dns <- dns;
-  Unix.system @@
+  ignore @@ Unix.system @@
   sprintf "ifconfig %s %s netmask %s"
     tap.devname
     (V4.to_string @@ V4.of_int32 tap.ipaddr)

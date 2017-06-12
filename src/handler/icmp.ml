@@ -1,6 +1,6 @@
 open Icmp_wire
 
-let handle writer frame ether ipv4 =
+let handle frame ether ipv4 =
   match of_frame frame with
   | Some (Echo_requets req) ->
     let icmp = to_pkg @@ Echo_reply req in
@@ -10,5 +10,5 @@ let handle writer frame ether ipv4 =
         ~dip:ipv4.Ipv4_wire.sip (Cstruct.len icmp)
     in
     let ether = Ether_wire.to_pkt @@ Ether_wire.rev_mac ether in
-    Utils.send writer (Cstruct.concat [ ether; ip; icmp ])
+    Inetio.send_cstruct (Cstruct.concat [ ether; ip; icmp ])
   | _ -> ()

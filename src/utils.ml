@@ -63,7 +63,7 @@ let checksum_list packets =
 
 let validate_list packets = checksum_list packets = 0
 
-let send writer packet =
-  let open Async in
-  Writer.write writer (Cstruct.to_string packet);
-  ignore @@ Writer.flushed writer
+let send_bytes ?pos ?len frame =
+  let pos = Option.value pos ~default:0 in
+  let len = Option.value len ~default:(Bytes.length frame) in
+  ignore @@ Unix.write Iface.fd ~buf:frame ~pos ~len
