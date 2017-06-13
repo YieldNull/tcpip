@@ -10,7 +10,6 @@
 
 open Core
 open Cstruct
-open Async.Print
 
 module Option = struct
   [%%cenum

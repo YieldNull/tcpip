@@ -19,22 +19,11 @@ type t =
     mutable rcv_next    : int32;
     mutable rcv_window  : int;
     mutable rcv_urgent  : int32;
+    snd_queue : (Caml.Bytes.t) Squeue.t;
+    rcv_queue : (Caml.Bytes.t) Squeue.t;
   }
 
-let open_listen () =
-  { state = Tcp_state.ST_LISTEN;
-    snd_isn     = 0l;
-    snd_unack   = 0l;
-    snd_next    = 0l;
-    snd_window  = 65535;
-    snd_urgent  = 0l;
-    rcv_isn     = 0l;
-    rcv_next    = 0l;
-    rcv_window  = 65535;
-    rcv_urgent  = 0l;
-  }
-
-let open_send () =
+let create_conn () =
   { state       = Tcp_state.ST_CLOSED;
     snd_isn     = 0l;
     snd_unack   = 0l;
@@ -45,6 +34,8 @@ let open_send () =
     rcv_next    = 0l;
     rcv_window  = 65535;
     rcv_urgent  = 0l;
+    snd_queue   = Squeue.create 1024;
+    rcv_queue   = Squeue.create 1024;
   }
 
 let gen_syn_active ~sport ~dip ~dport conn =
@@ -87,7 +78,7 @@ let gen_rst ?conn tcp =
     payload = Cstruct.of_bytes Caml.Bytes.empty;
   }
 
-let gen_fin_ack conn tcp =
+let gen_fin conn tcp =
   conn.snd_unack <- tcp.ack;
   conn.rcv_next <- (of_int_exn @@ Cstruct.len tcp.payload) + tcp.seq;
   { sip     = Iface.ipaddr ();
@@ -120,9 +111,14 @@ let gen_syn_ack conn tcp =
     payload = Cstruct.of_bytes Caml.Bytes.empty;
   }
 
-let gen_ack_ctrl conn tcp =
-  conn.snd_unack <- tcp.ack;
-  conn.rcv_next <- (of_int_exn @@ Cstruct.len tcp.payload) + tcp.seq + 1l;
+let gen_ack ?data conn tcp =
+  let datalen = match data with
+    | Some d -> of_int_exn (Cstruct.len d)
+    | _ -> 0l
+  in
+  conn.snd_unack <- tcp.ack + datalen;
+  conn.rcv_next <- (of_int_exn @@ Cstruct.len tcp.payload)
+                   + tcp.seq + (if datalen = 0l then 1l else 0l);
   { sip     = Iface.ipaddr ();
     dip     = tcp.sip;
     sport   = tcp.dport;
@@ -137,19 +133,3 @@ let gen_ack_ctrl conn tcp =
   }
 (* The segment length (SEG.LEN) includes both data and sequence
    space occupying controls. [RFC793#3.3 page 26] *)
-
-let gen_ack_data conn tcp data =
-  conn.snd_unack <- tcp.ack + (of_int_exn (Cstruct.len data));
-  conn.rcv_next <- (of_int_exn @@ Cstruct.len tcp.payload) + tcp.seq;
-  { sip     = Iface.ipaddr ();
-    dip     = tcp.sip;
-    sport   = tcp.dport;
-    dport   = tcp.sport;
-    seq     = tcp.ack;
-    ack     = conn.rcv_next;
-    ctrl    = ctrl_list_to_int [ACK];
-    window  = conn.rcv_window;
-    urgent  = 0;
-    options = [];
-    payload = data;
-  }

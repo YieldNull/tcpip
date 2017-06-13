@@ -1,30 +1,25 @@
 (* Improving TCP's Robustness to Blind In-Window Attacks
    https://tools.ietf.org/html/rfc5961
 *)
-
 open Tcp_wire
 open Tcp_conn
+open Tcp_state
 open Core
-open Ipaddr
+open Socket
 
-type t =
-  { remote_ip  : int32;
-    conns      : (int, Tcp_conn.t) Hashtbl.t; (* remote port -> connection *)
-    handler    : Tcp_conn.t -> Tcp_wire.t -> Tcp_wire.t list
+type clientconn = Socket.t * Tcp_conn.t
+
+type serverconn =
+  { socket  : Socket.t;
+    queue   : (Tcp_wire.t) Squeue.t;
+    conns   : (sockaddr, clientconn) Shashtbl.t
   }
 
-let handlers = Hashtbl.create ~hashable:Int.hashable () (* local port -> handler *)
+type conntype =
+  | ClientConn of clientconn
+  | ServerConn of serverconn
 
-let find_conn tcp =
-  match Hashtbl.find handlers tcp.dport with
-  | None -> None
-  | Some handler ->
-    if handler.remote_ip = 0l || handler.remote_ip = tcp.sip then
-      Some (handler.handler,
-            (Hashtbl.find_or_add handler.conns tcp.sport
-               ~default:(fun () -> open_listen ())))
-    else
-      None
+let connections:((int,conntype) Shashtbl.t) = Shashtbl.create ~hashable:Int.hashable ()
 
 let send_frame tcp =
   match Iface.arp_find tcp.dip with
@@ -34,19 +29,74 @@ let send_frame tcp =
     let ip = Ipv4_wire.tcp_pkt tcp.dip (Cstruct.len pkt) in
     Inetio.send_cstruct (Cstruct.concat [ether; ip; pkt])
 
+let send_rst tcp = send_frame (gen_rst tcp)
+
+let establish socket tcp =
+  let sockaddr = Sockaddr.create tcp.sip tcp.sport in
+  let peer = Socket.socket socket.socktype in
+  peer.sockaddr <- Some sockaddr;
+  socket.peer <- Some peer;
+  let msg = Sexp.to_string @@ sexp_of_response (Res_Socket socket) in
+  Utils.sendto_file socket.pipename msg
+
+let transfer socket conn tcp =
+  let prestate = conn.state in
+  let action = ctrl_to_action tcp.ctrl in
+  match trans_state prestate action with
+  | None -> send_rst tcp
+  | Some (newstate, action) ->
+    conn.state <- newstate;
+    if prestate <> ST_ESTABLISHED && newstate = ST_ESTABLISHED then
+      establish socket tcp;
+    match action with
+    | Some AT_ACK -> send_frame (gen_ack conn tcp)
+    | Some AT_SYN_ACK -> send_frame (gen_syn_ack conn tcp)
+    | Some AT_FIN -> send_frame (gen_fin conn tcp)
+    | _ -> ()
+
+let handle_tcp tcp =
+  let remoteaddr = Sockaddr.create tcp.sip tcp.sport in
+  match Shashtbl.find connections tcp.dport with
+  | None -> send_rst tcp
+  | Some (ClientConn (sock, conn)) -> let peer = Socket.peer_exn sock in
+    if peer.sockaddr = Some remoteaddr then
+      transfer sock conn tcp
+    else send_rst tcp
+  | Some (ServerConn sv) -> let svip = Socket.ipaddr_exn sv.socket in
+    if svip = 0l || tcp.dip = svip then
+      if is_ctrl_set tcp.ctrl SYN then
+        begin
+          if not (Squeue.push_or_drop sv.queue tcp) then
+            send_rst tcp
+        end
+      else
+        match Shashtbl.find sv.conns remoteaddr with
+        | None -> send_rst tcp
+        | Some (sock, conn) -> transfer sock conn tcp
+
 let handle frame ipv4 =
-  let open Async in
   match of_frame frame ipv4 with
   | None -> ()
-  | Some tcp -> match find_conn tcp with
-    | None -> send_frame (gen_rst tcp)
-    | Some (f, conn) ->
-      List.iter (f conn tcp) ~f:(fun pkt -> send_frame pkt)
+  | Some tcp -> handle_tcp tcp
 
-let listen port handler =
-  Hashtbl.add_exn handlers ~key:port
-    ~data:
-      { remote_ip  = 0l;
-        conns      = Hashtbl.create ~hashable:Int.hashable ();
-        handler    = handler;
-      }
+exception NotServerConn
+
+let listen socket backlog =
+  let server =
+    { socket;
+      queue = Squeue.create backlog;
+      conns = Shashtbl.create ~hashable:Socket.Sockaddr.hashable ();
+    }
+  in
+  Shashtbl.add_exn connections ~key:(Socket.port_exn socket) ~data:(ServerConn server)
+
+let accept socket =
+  match Shashtbl.find_exn connections (Socket.port_exn socket) with
+  | ClientConn _ -> raise NotServerConn
+  | ServerConn sv ->
+    let tcp = Squeue.pop sv.queue in
+    let conn = create_conn () in
+    let sockaddr = Sockaddr.create tcp.sip tcp.sport in
+    conn.state <- ST_LISTEN;
+    Shashtbl.add_exn sv.conns ~key:sockaddr ~data:(socket, conn);
+    Handler.add_task (fun () -> handle_tcp tcp)

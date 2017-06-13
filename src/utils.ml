@@ -63,7 +63,7 @@ let checksum_list packets =
 
 let validate_list packets = checksum_list packets = 0
 
-let send_bytes ?pos ?len frame =
-  let pos = Option.value pos ~default:0 in
-  let len = Option.value len ~default:(Bytes.length frame) in
-  ignore @@ Unix.write Iface.fd ~buf:frame ~pos ~len
+let sendto_file filename msg =
+  let fd = Unix.openfile filename ~mode:[Unix.O_WRONLY] in
+  ignore @@ Unix.write fd ~buf:msg;
+  Unix.close fd

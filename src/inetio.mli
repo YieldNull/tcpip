@@ -1,3 +1,5 @@
-val read : unit -> Cstruct.t
+val read : unit -> bytes
+val send : bytes -> unit
 val send_cstruct : Cstruct.t -> unit
-val send_bytes : ?pos:int -> ?len:int -> bytes -> unit
+
+val pop_snd : unit -> bytes

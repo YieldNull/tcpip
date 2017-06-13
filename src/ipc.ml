@@ -1,22 +1,19 @@
 open Core
-open Unix
+open Socket
 
-let pipename = "pipe"
+let buf = String.create 81920
 
-type request =
-  | Connect of Socket.t * Socket.sockaddr
-  | Listen  of Socket.t * int
-  | Accept  of Socket.t
-  | Close   of Socket.t * Socket.shutdown
-  | Read    of Socket.t
-  | Write   of Socket.t * string
-[@@deriving sexp]
-
-type response =
-  | Sockaddr of Socket.sockaddr
-  | Payload  of string
-  | OK
-[@@deriving sexp]
-
-
-let handle fd = ()
+let handle pipe =
+  let len = Unix.read pipe ~buf in
+  if len > 0 then
+    let data = String.sub buf ~pos:0 ~len in
+    let req = request_of_sexp @@ Sexp.of_string data in
+    match req with
+    | Req_Listen (socket, backlog) ->
+      let msg =
+        Tcp.listen socket backlog;
+        Sexp.to_string @@ sexp_of_response (Res_OK)
+      in
+      write socket msg
+    | Req_Accept socket -> Tcp.accept socket
+    | _ -> ()
