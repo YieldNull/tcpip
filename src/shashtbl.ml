@@ -25,3 +25,9 @@ let find_exn t key =
 
 let remove t key =
   wrap t (fun () -> Hashtbl.remove t.hashtbl key)
+
+let iter_keys t ~f =
+  wrap t (fun () -> Hashtbl.iter_keys t.hashtbl ~f)
+
+let length t =
+  wrap t (fun () -> Hashtbl.length t.hashtbl)

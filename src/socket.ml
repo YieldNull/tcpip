@@ -35,7 +35,7 @@ type t =
   { socktype          : socktype;
     pipename          : string;
     mutable sockaddr  : sockaddr option;
-    mutable peer      : t option;
+    mutable peer      : sockaddr option;
   }
 [@@deriving sexp]
 
@@ -45,13 +45,13 @@ module Msg = struct
     | Req_Listen  of t * int
     | Req_Accept  of t
     | Req_Close   of t * shutdown
-    | Req_Read    of t
+    | Req_Read    of t * int
     | Req_Write   of t * string
   [@@deriving sexp]
 
   type response =
     | Res_Socket of t
-    | Res_Payload of string
+    | Res_Data of string
     | Res_Err of Error.t
     | Res_OK
   [@@deriving sexp]
@@ -60,6 +60,7 @@ include Msg
 
 exception SocketNotBound
 exception SocketNotConnected
+exception SocketNoAddress
 
 let ipaddr_exn socket =
   match socket.sockaddr with
@@ -76,6 +77,11 @@ let peer_exn socket =
   | Some peer -> peer
   | _ -> raise SocketNotConnected
 
+let sockaddr_exn socket =
+  match socket.sockaddr with
+  | Some sockaddr -> sockaddr
+  | _ -> raise SocketNoAddress
+
 let pipename = "pipe_ctrl"
 
 let buf = String.create 81920
@@ -88,20 +94,28 @@ let rcv_msg socket =
   print_endline data;
   response_of_sexp @@ Sexp.of_string data
 
+let mutex = Mutex.create ()
+
 let send_msg socket req =
+  Mutex.lock mutex;
   let fd = Unix.openfile pipename ~mode:[Unix.O_WRONLY] in
   let msg = Sexp.to_string (sexp_of_request req) in
-  ignore @@ Unix.write fd msg;
-  Unix.close fd;
   print_endline msg;
+  protect
+    ~f:(fun () ->
+        ignore @@ Unix.write fd msg
+      )
+    ~finally:(fun () -> Mutex.unlock mutex);
+  Unix.close fd;
   rcv_msg socket
 
-let socket socktype =
+let create socktype =
   let pipename = "pipe_" ^ (Time.to_string (Time.now ())) in
   Unix.mkfifo pipename ~perm:0o660;
-  { socktype; sockaddr = None; peer = None; pipename}
+  { socktype; sockaddr = None; peer = None; pipename; }
 
-let bind socket sockaddr = socket.sockaddr <- Some sockaddr
+let bind socket sockaddr =
+  socket.sockaddr <- Some sockaddr
 
 let listen socket backlog =
   let req = Req_Listen (socket, backlog) in
@@ -118,8 +132,28 @@ let accept socket =
 
 let connect socket sockaddr = ()
 
-let read ?(pos = 0) ?len socket ~buf = ()
+let read ?(pos = 0) ?len socket ~buf =
+  let len = Option.value len ~default:(String.length buf) in
+  match send_msg socket (Req_Read (socket, len)) with
+  | Res_Data data ->
+    let len = String.length data in
+    String.blit ~src:data ~src_pos:0 ~dst:buf ~dst_pos:pos ~len;
+    len
+  | _ -> failwith "unkonwn exception"
 
-let write ?(pos = 0) ?len socket ~buf = ()
+let write ?(pos = 0) ?len socket ~buf =
+  let len = Option.value len ~default:(String.length buf) in
+  let data = String.sub buf ~pos ~len in
+  match send_msg socket (Req_Write (socket, data)) with
+  | Res_OK -> ()
+  | _ -> failwith "unkonwn exception"
 
-let close ?(shutdown = SHUTDOWN_ALL) socket = ()
+(* TODO Return the number of bytes actually written *)
+
+let close ?(shutdown = SHUTDOWN_ALL) socket =
+  match socket.sockaddr with
+  | None -> ()
+  | _ ->
+    match send_msg socket (Req_Close (socket, shutdown)) with
+    | Res_OK -> Unix.remove socket.pipename
+    | _ -> failwith "unkonwn exception"
