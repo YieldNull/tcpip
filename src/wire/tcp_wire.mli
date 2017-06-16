@@ -110,3 +110,6 @@ val of_frame : Cstruct.t -> Ipv4_wire.t -> t option
 val to_pkt : t -> Cstruct.t
 
 val to_string : t -> string
+
+val find_opt_mss : t -> int option
+val find_opt_wscale : t -> int option

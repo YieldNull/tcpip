@@ -10,6 +10,6 @@ let () =
   let len = read socket buf in
   let data = String.sub buf ~pos:0 ~len in
   print_endline data;
-  write socket "<html><body><h1>Hello World!</h1></body></html";
+  ignore @@ write socket "<html><body><h1>Hello World!</h1></body></html>\n";
   close socket;
   close server

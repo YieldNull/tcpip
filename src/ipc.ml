@@ -26,6 +26,7 @@ let handle pipe =
       let data = Tcp.read socket len in
       send_response socket (Res_Data data)
     | Req_Write (socket, data) ->
-      Tcp.write socket data;
-      send_response socket Res_OK
-    | _ -> ()
+      let count = Tcp.write socket data in
+      send_response socket (Res_Int count)
+    | Req_Connect (socket, sockaddr) ->
+      Tcp.connect socket sockaddr

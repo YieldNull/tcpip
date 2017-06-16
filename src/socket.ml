@@ -50,9 +50,10 @@ module Msg = struct
   [@@deriving sexp]
 
   type response =
-    | Res_Socket of t
-    | Res_Data of string
-    | Res_Err of Error.t
+    | Res_Socket  of t
+    | Res_Data    of string
+    | Res_Int     of int
+    | Res_Err     of Error.t
     | Res_OK
   [@@deriving sexp]
 end
@@ -130,8 +131,6 @@ let accept socket =
   | Res_Socket newsock -> newsock
   | _ -> failwith "unkonwn exception"
 
-let connect socket sockaddr = ()
-
 let read ?(pos = 0) ?len socket ~buf =
   let len = Option.value len ~default:(String.length buf) in
   match send_msg socket (Req_Read (socket, len)) with
@@ -145,10 +144,8 @@ let write ?(pos = 0) ?len socket ~buf =
   let len = Option.value len ~default:(String.length buf) in
   let data = String.sub buf ~pos ~len in
   match send_msg socket (Req_Write (socket, data)) with
-  | Res_OK -> ()
+  | Res_Int x -> x
   | _ -> failwith "unkonwn exception"
-
-(* TODO Return the number of bytes actually written *)
 
 let close ?(shutdown = SHUTDOWN_ALL) socket =
   match socket.sockaddr with
@@ -157,3 +154,9 @@ let close ?(shutdown = SHUTDOWN_ALL) socket =
     match send_msg socket (Req_Close (socket, shutdown)) with
     | Res_OK -> Unix.remove socket.pipename
     | _ -> failwith "unkonwn exception"
+
+let connect socket sockaddr =
+  let req = Req_Connect (socket, sockaddr) in
+  match send_msg socket req with
+  | Res_Socket so -> socket.peer <- so.peer; socket.sockaddr <- so.sockaddr
+  | _ -> failwith "unkonwn exception"

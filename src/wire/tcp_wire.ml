@@ -241,16 +241,18 @@ module Option = struct
       let take opt len =
         aux (opt :: acc) (Cstruct.shift buf len)
       in
-      match int_to_opcode @@ Cstruct.get_uint8 buf 0 with
-      | None -> let len = Cstruct.get_uint8 buf 1 in aux acc (Cstruct.shift buf len)
-      | Some kind -> match kind with
-        | END_OF_OPTIONS -> (End_of_options (eol_of_buf buf)) :: acc
-        | NO_OPERATION -> take (No_operation (noper_of_buf buf)) sizeof_noper
-        | MAX_SEGMENTATION_SIZE -> take (Max_segmentation_size (mss_of_buf buf)) sizeof_mss
-        | WINDOW_SCALE -> take (Window_scale (wscale_of_buf buf)) sizeof_wscale
-        | SACK_PERMITTED -> take (Sack_permitted (sackpm_of_buf buf)) sizeof_sack
-        | SACK -> let sack = sack_of_buf buf in take (Sack sack) sack.len
-        | TIMESTAMPS -> take (Timestamps (tmstamps_of_buf buf)) sizeof_tmstamps
+      if Cstruct.len buf = 0 then acc
+      else
+        match int_to_opcode @@ Cstruct.get_uint8 buf 0 with
+        | None -> let len = Cstruct.get_uint8 buf 1 in aux acc (Cstruct.shift buf len)
+        | Some kind -> match kind with
+          | END_OF_OPTIONS -> (End_of_options (eol_of_buf buf)) :: acc
+          | NO_OPERATION -> take (No_operation (noper_of_buf buf)) sizeof_noper
+          | MAX_SEGMENTATION_SIZE -> take (Max_segmentation_size (mss_of_buf buf)) sizeof_mss
+          | WINDOW_SCALE -> take (Window_scale (wscale_of_buf buf)) sizeof_wscale
+          | SACK_PERMITTED -> take (Sack_permitted (sackpm_of_buf buf)) sizeof_sack
+          | SACK -> let sack = sack_of_buf buf in take (Sack sack) sack.len
+          | TIMESTAMPS -> take (Timestamps (tmstamps_of_buf buf)) sizeof_tmstamps
     in
     if Cstruct.len buf = 0 then [] else aux [] buf
 
@@ -389,3 +391,21 @@ let to_pkt t =
   let pstcp = build_pseudo_header t.sip t.dip len in
   set_tcp_checksum header (Utils.checksum_list [pstcp; header; options; padding; t.payload]);
   Cstruct.concat [header; options; padding; t.payload]
+
+let find_opt_mss t =
+  let open Option in
+  let rec aux = function
+    | [] -> None
+    | ( Max_segmentation_size mss ) :: xs -> Some (mss.mss)
+    | x :: xs -> aux xs
+  in
+  aux t.options
+
+let find_opt_wscale t =
+  let open Option in
+  let rec aux = function
+    | [] -> None
+    | ( Window_scale ws ) :: xs -> Some (ws.cnt)
+    | x :: xs -> aux xs
+  in
+  aux t.options

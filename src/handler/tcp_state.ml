@@ -14,8 +14,8 @@ open Core
 type t =
   | ST_CLOSED
   | ST_LISTEN
-  | ST_AT_SYN_SENT
-  | ST_AT_SYN_RECEIVED
+  | ST_SYN_SENT
+  | ST_SYN_RECEIVED
   | ST_ESTABLISHED
   | ST_FIN_WAIT1
   | ST_FIN_WAIT2
@@ -51,8 +51,8 @@ let action_to_int = function
 let state_to_int = function
   | ST_CLOSED       -> 0
   | ST_LISTEN       -> 1
-  | ST_AT_SYN_SENT     -> 2
-  | ST_AT_SYN_RECEIVED -> 3
+  | ST_SYN_SENT     -> 2
+  | ST_SYN_RECEIVED -> 3
   | ST_ESTABLISHED  -> 4
   | ST_FIN_WAIT1    -> 5
   | ST_FIN_WAIT2    -> 6
@@ -67,24 +67,24 @@ let table =
   let arr =
     [|
       ST_CLOSED,       [ AT_OPEN_PAS >> ST_LISTEN, None;
-                         AT_OPEN_ACT >> ST_AT_SYN_SENT, Some AT_SYN;
+                         AT_OPEN_ACT >> ST_SYN_SENT, Some AT_SYN;
                          AT_RST      >> ST_CLOSED, None ];
 
-      ST_LISTEN,       [ AT_SYN   >> ST_AT_SYN_RECEIVED, Some AT_SYN_ACK;
+      ST_LISTEN,       [ AT_SYN   >> ST_SYN_RECEIVED, Some AT_SYN_ACK;
                          AT_CLOSE >> ST_CLOSED, None;
                          AT_RST   >> ST_LISTEN, None ];
       (* The state transition from LISTEN to SYN_SENT is legal in the TCP protocol
          but is not supported by Berkeley sockets and is rarely seen. *)
 
-      ST_AT_SYN_SENT,     [ AT_SYN     >> ST_AT_SYN_RECEIVED, Some AT_SYN_ACK;
-                            AT_SYN_ACK >> ST_ESTABLISHED, Some AT_ACK;
-                            AT_CLOSE   >> ST_CLOSED, None;
-                            AT_TIMEOUT >> ST_CLOSED, None;
-                            AT_RST     >> ST_CLOSED, None];
+      ST_SYN_SENT,     [ AT_SYN     >> ST_SYN_RECEIVED, Some AT_SYN_ACK;
+                         AT_SYN_ACK >> ST_ESTABLISHED, Some AT_ACK;
+                         AT_CLOSE   >> ST_CLOSED, None;
+                         AT_TIMEOUT >> ST_CLOSED, None;
+                         AT_RST     >> ST_CLOSED, None];
 
-      ST_AT_SYN_RECEIVED, [ AT_ACK      >> ST_ESTABLISHED, None;
-                            AT_CLOSE    >> ST_FIN_WAIT1, Some AT_FIN;
-                            AT_RST      >> ST_LISTEN, None ];
+      ST_SYN_RECEIVED, [ AT_ACK      >> ST_ESTABLISHED, None;
+                         AT_CLOSE    >> ST_FIN_WAIT1, Some AT_FIN;
+                         AT_RST      >> ST_LISTEN, None ];
       (* If the receiver was in SYN-RECEIVED state
          and had previously been in the LISTEN state,
          then the receiver returns to the LISTEN state,
