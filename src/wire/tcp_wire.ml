@@ -254,7 +254,7 @@ module Option = struct
           | SACK -> let sack = sack_of_buf buf in take (Sack sack) sack.len
           | TIMESTAMPS -> take (Timestamps (tmstamps_of_buf buf)) sizeof_tmstamps
     in
-    if Cstruct.len buf = 0 then [] else aux [] buf
+    aux [] buf
 
   let list_to_buf options =
     Cstruct.concat @@ List.map options ~f:(function

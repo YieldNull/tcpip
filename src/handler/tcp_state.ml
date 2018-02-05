@@ -7,6 +7,10 @@
 
   Reset Processing
   https://tools.ietf.org/html/rfc793#page-37
+
+  Requirements for Internet Hosts -- Communication Layers
+  4.2.2.8  TCP Connection State Diagram
+  https://tools.ietf.org/html/rfc1122#page-86
 *)
 
 open Core
