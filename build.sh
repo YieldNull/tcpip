@@ -17,7 +17,7 @@ ocamlbuild -r \
     -cflags "-w A-4-33-40-41-42-43-34-44" \
     -cflags -strict-sequence \
     -pkgs core,ipaddr,cstruct \
-    -pkgs ppx_cstruct,ppx_sexp_conv,ppx_hash,ppx_deriving,ppx_compare \
+    -pkgs ppx_sexp_conv,ppx_hash,ppx_deriving,ppx_compare,ppx_cstruct \
     -Is src,src/wire,src/handler,src/util,app \
     -lflags $ocamlc`pwd`/src/stubs.c \
     $*
